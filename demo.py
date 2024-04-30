@@ -1,6 +1,10 @@
 import pandas as pd
 from Levenshtein import distance as levenshtein_distance
 from itertools import chain
+import numpy as np
+from pyod.models.iforest import IForest
+
+numerics = ['int16', 'int32', 'int64', 'float16', 'float32', 'float64']
 
 # Read the dataset and truth file
 df = pd.read_csv('test2.csv')
@@ -70,6 +74,26 @@ analyze_values(low_proportion_values, high_proportion_values, calculate_misspell
 #print("\nAnomalies (average distance > {}):".format(anomaly_threshold))
 #for anomaly, avg_dist in anomalies.items():
 #    print(f"{anomaly}: {avg_dist} at indices {anomaly_indices[anomaly]}")
+
+# PyOD for numerical outliers detection
+numerical_columns = df.select_dtypes(include=numerics).columns
+
+# Train Isolation Forest model for each numerical column
+outliers = {}
+for column in numerical_columns:
+    numerical_data = df[column].values.reshape(-1, 1)
+    if_model = IForest(contamination=0.1, random_state=42)
+    if_model.fit(numerical_data)
+    outliers[column] = if_model.predict(numerical_data)
+
+# Get outlier indices for each numerical column
+outlier_indices = {column: np.where(outliers[column] == 1)[0] for column in numerical_columns}
+
+# Print outlier indices for each numerical column
+for column in numerical_columns:
+    print(f"Numerical Outlier Indices for {column}: {outlier_indices[column]}")
+
+
 
 # Calculate TP
 def is_accurate(detected_indices, truth_df, truth_type):
