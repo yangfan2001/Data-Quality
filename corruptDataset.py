@@ -15,40 +15,58 @@ def corrupt_dataset(old_file_name, corrupted_cols, new_file_name):
     :return: None, saves two files - the corrupted dataset and a tracker file.
     """
     df = pd.read_csv(old_file_name)
-    # Create a DataFrame to track changes, initialized with '1' (Valid value)
     corruption_tracker = pd.DataFrame(1, index=np.arange(len(df)), columns=df.columns)
 
     for col_idx, corruption_percentage in corrupted_cols:
+        column_type = df.dtypes[col_idx]
         num_corrupt = int(len(df) * corruption_percentage / 100)
         corrupt_indices = random.sample(range(len(df)), num_corrupt)
 
+        if column_type in ['float64', 'float32']:
+            noise_level = 10 * df.iloc[:, col_idx].std()
+            noise_func = np.random.normal
+        elif column_type in ['int64', 'int32']:
+            noise_level = int(10 * df.iloc[:, col_idx].std())
+            noise_func = lambda mean, std: int(np.random.normal(mean, std))
+        else:
+            noise_level = None  # 不应用噪声于非数值列
+
         for idx in corrupt_indices:
-            action = random.choice(['add_remove', 'nonsense', 'null'])
+            if column_type in ['float64', 'float32', 'int64', 'int32']:
+                action = random.choice(['noise', 'null'])
+            else:
+                action = random.choice(['add_remove', 'nonsense', 'null'])
 
-            if action == 'add_remove':
-                original_str = str(df.iloc[idx, col_idx])
-                if len(original_str) > 1 and random.choice([True, False]):
-                    position_to_remove = random.randint(0, len(original_str) - 1)
-                    modified_str = original_str[:position_to_remove] + original_str[position_to_remove + 1:]
-                else:
-                    char_to_add = random.choice(string.ascii_letters)
-                    position_to_add = random.randint(0, len(original_str))
-                    modified_str = original_str[:position_to_add] + char_to_add + original_str[position_to_add:]
-                df.iloc[idx, col_idx] = modified_str
-                corruption_tracker.iloc[idx, col_idx] = 2  # Mark as Misspelling/Abbreviation
-
-            elif action == 'nonsense':
-                nonsense_str = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
-                df.iloc[idx, col_idx] = nonsense_str
-                corruption_tracker.iloc[idx, col_idx] = 3  # Mark as Invalid value
+            if action == 'noise' and noise_level is not None:
+                original_val = df.iloc[idx, col_idx]
+                noise = noise_func(0, noise_level)
+                df.iloc[idx, col_idx] = original_val + noise
+                corruption_tracker.iloc[idx, col_idx] = 5  # Mark as Noise added
 
             elif action == 'null':
                 df.iloc[idx, col_idx] = np.nan
                 corruption_tracker.iloc[idx, col_idx] = 4  # Mark as NULL value
 
+            elif action == 'add_remove':
+                # 对非数值列处理逻辑
+                pass
+            elif action == 'nonsense':
+                # 对非数值列处理逻辑
+                pass
+
     df.to_csv(new_file_name, index=False)
     tracker_file_name = new_file_name.replace(".csv", "_tracker.csv")
     corruption_tracker.to_csv(tracker_file_name, index=False)
 
+
 if __name__ == '__main__':
-    corrupt_dataset('Public_Recycling_Bins_20240427.csv', [(1, 10), (2, 20)], "test.csv")
+    corrupt_dataset('./Dataset/2018_Central_Park_Squirrel_Census_-_Squirrel_Data_20240427.csv',
+                    [(2, 5), (1, 5),(6,5)], "test_num1.csv")
+    corrupt_dataset('./Dataset/SAT__College_Board__2010_School_Level_Results_20240504.csv',
+                    [(2, 10), (3, 5),(4,5),(5,5)], "test_num2.csv")
+    corrupt_dataset('./Dataset/Air_Quality_20240504.csv',
+                    [(10, 10)], "test_num3.csv")
+    corrupt_dataset('./Dataset/Current_Reservoir_Levels_20240505.csv',
+                    [(1, 10), (3, 10)], "test_num4.csv")
+
+#%%
