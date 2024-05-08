@@ -29,7 +29,7 @@ def corrupt_dataset(old_file_name, corrupted_cols, new_file_name):
             noise_level = int(10 * df.iloc[:, col_idx].std())
             noise_func = lambda mean, std: int(np.random.normal(mean, std))
         else:
-            noise_level = None  # 不应用噪声于非数值列
+            noise_level = None
 
         for idx in corrupt_indices:
             if column_type in ['float64', 'float32', 'int64', 'int32']:
@@ -48,11 +48,22 @@ def corrupt_dataset(old_file_name, corrupted_cols, new_file_name):
                 corruption_tracker.iloc[idx, col_idx] = 4  # Mark as NULL value
 
             elif action == 'add_remove':
-                # 对非数值列处理逻辑
-                pass
+                original_str = str(df.iloc[idx, col_idx])
+                if len(original_str) > 1 and random.choice([True, False]):
+                    position_to_remove = random.randint(0, len(original_str) - 1)
+                    modified_str = original_str[:position_to_remove] + original_str[position_to_remove + 1:]
+                else:
+                    char_to_add = random.choice(string.ascii_letters)
+                    position_to_add = random.randint(0, len(original_str))
+                    modified_str = original_str[:position_to_add] + char_to_add + original_str[position_to_add:]
+                df.iloc[idx, col_idx] = modified_str
+                corruption_tracker.iloc[idx, col_idx] = 2  # Mark as Misspelling/Abbreviation
+
             elif action == 'nonsense':
-                # 对非数值列处理逻辑
-                pass
+                nonsense_str = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+                df.iloc[idx, col_idx] = nonsense_str
+                corruption_tracker.iloc[idx, col_idx] = 3  # Mark as Invalid value
+
 
     df.to_csv(new_file_name, index=False)
     tracker_file_name = new_file_name.replace(".csv", "_tracker.csv")
